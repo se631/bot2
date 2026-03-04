@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActivityType } = require('discord.js');
 const { Client: SelfBotClient } = require('discord.js-selfbot-v13');
 const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
 
@@ -30,6 +30,12 @@ const colors = {
 // Ana Bot Başladığında
 mainBot.once('ready', async () => {
     console.log(`${colors.green}✅ Ana bot başarıyla giriş yaptı: ${mainBot.user.tag}${colors.reset}`);
+
+    // Yayında statüsü ve yazısı
+    mainBot.user.setActivity('Developed By CyrusFix', {
+        type: ActivityType.Streaming,
+        url: 'https://www.twitch.tv/discord'
+    });
 
     // Slash commandlarımızı hazırlayalım
     const commands = [
@@ -88,6 +94,10 @@ mainBot.once('ready', async () => {
 
             selfBot.on('ready', () => {
                 console.log(`${colors.green}🤖 Özel hesap giriş yaptı: ${selfBot.user.tag}${colors.reset}`);
+                selfBot.user.setActivity('Developed By CyrusFix', {
+                    type: 'STREAMING',
+                    url: 'https://www.twitch.tv/discord'
+                });
             });
 
             try {
