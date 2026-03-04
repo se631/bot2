@@ -25,7 +25,7 @@ function setupMainBot() {
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: true,
+            selfDeaf: false,
             selfMute: true
         });
 
@@ -71,7 +71,7 @@ client.on('interactionCreate', async interaction => {
                     const channel = await worker.channels.fetch(userChannel.id);
                     await channel.join();
                     const me = worker.guilds.cache.get(interaction.guildId).me;
-                    await me.voice.setSelfDeaf(true);
+                    await me.voice.setSelfDeaf(false);
                     await me.voice.setSelfMute(true);
                     activeWorkers.push(worker);
                 } catch (e) { console.log("Worker hatası: " + e.message); }
@@ -90,3 +90,4 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(mainToken);
+
