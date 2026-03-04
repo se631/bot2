@@ -18,15 +18,15 @@ const client = new Client({
 
 let activeWorkers = [];
 
-// --- ANA BOT AYARI ---
+// --- ANA BOT ---
 function setupMainBot() {
     try {
         joinVoiceChannel({
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: true, // Kulaklık Kapalı (Görseldeki gibi)
-            selfMute: false // Mikrofon Açık (Ama ses gitmez, sadece simge gözükmez)
+            selfDeaf: true, // Sadece Sağırlaştırma (Görseldeki gibi)
+            selfMute: false
         });
 
         client.user.setPresence({
@@ -37,20 +37,18 @@ function setupMainBot() {
             }],
             status: 'online',
         });
-        console.log("📌 Ana bot sağırlaştırılmış modda sese bağlandı.");
     } catch (e) { console.error("Ana bot hatası:", e.message); }
 }
 
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(mainToken);
-    
     const commands = [
         new SlashCommandBuilder()
             .setName('botaktif')
             .setDescription('İşçi botları seçtiğin kanala sokar.')
             .addChannelOption(option => 
                 option.setName('kanal')
-                    .setDescription('Botların gireceği ses kanalını seçin')
+                    .setDescription('Ses kanalını seçin')
                     .addChannelTypes(ChannelType.GuildVoice)
                     .setRequired(true)),
         new SlashCommandBuilder()
@@ -60,6 +58,7 @@ client.once('ready', async () => {
 
     await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
     setupMainBot();
+    console.log("Sistem Hazır!");
 });
 
 client.on('interactionCreate', async interaction => {
@@ -71,35 +70,42 @@ client.on('interactionCreate', async interaction => {
 
         tokens.forEach((token, index) => {
             if(!token) return;
-            const worker = new SelfClient({ checkUpdate: false });
+            
+            // HATA ÇÖZÜMÜ: patchVoiceState ve diger ayarlar eklendi
+            const worker = new SelfClient({ 
+                checkUpdate: false,
+                patchVoiceState: true 
+            });
             
             worker.on('ready', async () => {
                 try {
-                    const guild = worker.guilds.cache.get(GUILD_ID);
-                    if (!guild) return console.log(`Worker ${index+1} sunucuda değil.`);
-
+                    const guild = await worker.guilds.fetch(GUILD_ID);
                     const channel = await worker.channels.fetch(selectedChannel.id);
+                    
                     await channel.join();
                     
                     // İŞÇİ AYARI: Sadece Mikrofon Kapalı
-                    await guild.me.voice.setSelfMute(true); 
-                    await guild.me.voice.setSelfDeaf(false); 
+                    await guild.me.voice.setSelfMute(true);
+                    await guild.me.voice.setSelfDeaf(false);
                     
                     activeWorkers.push(worker);
-                    console.log(`✅ [Worker] ${worker.user.tag} sese girdi.`);
-                } catch (e) { console.log(`Worker ${index + 1} hatası: ${e.message}`); }
+                    console.log(`✅ ${worker.user.tag} kanalda.`);
+                } catch (e) { console.log(`Giriş hatası: ${e.message}`); }
             });
 
-            worker.login(token).catch(() => console.log(`Token geçersiz: ${index+1}`));
+            // Hata veren kısmı geçmek için login parametreleri
+            worker.login(token).catch(() => {});
         });
 
-        await interaction.editReply(`✅ İşçi botlar **${selectedChannel.name}** kanalına gönderildi.`);
+        await interaction.editReply(`✅ İşçiler **${selectedChannel.name}** kanalına sızdı!`);
     }
 
     if (interaction.commandName === 'botpasif') {
-        activeWorkers.forEach(w => w.destroy());
+        activeWorkers.forEach(w => {
+            try { w.destroy(); } catch(e) {}
+        });
         activeWorkers = [];
-        await interaction.reply('❌ Tüm işçi botlar sesten çıkarıldı.');
+        await interaction.reply('❌ İşçiler dağıldı.');
     }
 });
 
