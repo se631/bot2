@@ -1,12 +1,11 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActivityType, ChannelType } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
 const { Client: SelfClient } = require('discord.js-selfbot-v13');
 
-// Değişkenleri Railway'den çekiyoruz
 const mainToken = process.env.MAIN_TOKEN;
 const workerTokensRaw = process.env.WORKER_TOKENS || "";
 const tokens = workerTokensRaw.split(',').map(t => t.trim());
-const MAIN_BOT_VOICE_ID = process.env.MAIN_BOT_VOICE_ID; // Ana botun sabit kalacağı yer
+const MAIN_BOT_VOICE_ID = process.env.MAIN_BOT_VOICE_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 const client = new Client({
@@ -19,15 +18,15 @@ const client = new Client({
 
 let activeWorkers = [];
 
-// Ana botun sürekli duracağı sabit kanal fonksiyonu
+// Ana botun sabit duracağı kanal
 function setupMainBot() {
     try {
         joinVoiceChannel({
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: true, // Sağırlaştırma
-            selfMute: false
+            selfDeaf: true,
+            selfMute: true
         });
 
         client.user.setPresence({
@@ -38,18 +37,23 @@ function setupMainBot() {
             }],
             status: 'online',
         });
-        console.log("📌 Ana bot sabit ses kanalına bağlandı.");
-    } catch (e) {
-        console.error("Ana bot ses hatası:", e.message);
-    }
+        console.log("📌 Ana bot sabit kanala bağlandı.");
+    } catch (e) { console.error("Ana bot hatası:", e.message); }
 }
 
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(mainToken);
+    
+    // KOMUT GÜNCELLEMESİ: Kanal seçeneği eklendi
     const commands = [
         new SlashCommandBuilder()
             .setName('botaktif')
-            .setDescription('İşçi botları bulunduğun ses kanalına çağırır.'),
+            .setDescription('İşçi botları seçtiğin kanala sokar.')
+            .addChannelOption(option => 
+                option.setName('kanal')
+                    .setDescription('Botların gireceği ses kanalını seçin')
+                    .addChannelTypes(ChannelType.GuildVoice) // Sadece ses kanallarını göster
+                    .setRequired(true)),
         new SlashCommandBuilder()
             .setName('botpasif')
             .setDescription('İşçi botları sesten çıkarır.')
@@ -63,12 +67,8 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'botaktif') {
-        // Komutu kullanan kişinin kanalını buluyoruz
-        const targetChannel = interaction.member.voice.channel;
-
-        if (!targetChannel) {
-            return interaction.reply({ content: '❌ Bu komutu kullanmak için bir ses kanalında olmalısın!', ephemeral: true });
-        }
+        // Seçilen kanalı alıyoruz
+        const selectedChannel = interaction.options.getChannel('kanal');
 
         await interaction.deferReply();
 
@@ -78,34 +78,26 @@ client.on('interactionCreate', async interaction => {
             
             worker.on('ready', async () => {
                 try {
-                    const channel = await worker.channels.fetch(targetChannel.id);
+                    const channel = await worker.channels.fetch(selectedChannel.id);
                     await channel.join();
                     
-                    // İşçi bot ayarları (Sağır + Mute)
                     const guild = worker.guilds.cache.get(interaction.guildId);
                     if (guild) {
-                        await guild.me.voice.setSelfDeaf(false);
+                        await guild.me.voice.setSelfDeaf(true);
                         await guild.me.voice.setSelfMute(true);
                     }
                     
                     activeWorkers.push(worker);
-                    console.log(`[Worker ${index + 1}] Kanala giriş yaptı: ${targetChannel.name}`);
-                } catch (e) { 
-                    console.log(`[Worker ${index + 1}] Giriş hatası: ${e.message}`); 
-                }
+                } catch (e) { console.log(`Worker ${index + 1} hatası: ${e.message}`); }
             });
 
-            worker.login(token).catch(() => console.log(`[Worker ${index + 1}] Token geçersiz!`));
+            worker.login(token).catch(() => {});
         });
 
-        await interaction.editReply(`✅ **${tokens.length}** adet işçi bot **${targetChannel.name}** kanalına başarıyla çekildi!`);
+        await interaction.editReply(`✅ İşçi botlar **${selectedChannel.name}** kanalına yönlendirildi!`);
     }
 
     if (interaction.commandName === 'botpasif') {
-        if (activeWorkers.length === 0) {
-            return interaction.reply({ content: 'Zaten aktif bir işçi bot yok.', ephemeral: true });
-        }
-        
         activeWorkers.forEach(w => w.destroy());
         activeWorkers = [];
         await interaction.reply('❌ Tüm işçi botlar sesten çıkarıldı.');
