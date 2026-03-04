@@ -94,7 +94,10 @@ mainBot.once('ready', async () => {
 
             selfBot.on('ready', () => {
                 console.log(`${colors.green}🤖 Özel hesap giriş yaptı: ${selfBot.user.tag}${colors.reset}`);
-                selfBot.user.setActivity('Developed By CyrusFix');
+                // Sadece Çevrimiçi gözüksün, oynuyor/yayıncı yazısı YOK
+                selfBot.user.setPresence({
+                    status: 'online'
+                });
             });
 
             try {
@@ -137,7 +140,7 @@ mainBot.on('interactionCreate', async interaction => {
                     guildId: channel.guild.id,
                     adapterCreator: channel.guild.voiceAdapterCreator,
                     selfMute: true,  // Mikrofon kapalı
-                    selfDeaf: true,  // Kulaklık kapalı (Tasarruf için önerilir)
+                    selfDeaf: false, // Kulaklık AÇIK (sadece mik kapalı istendi)
                     group: selfBot.user.id // Her bot için farklı grup şart
                 });
 
