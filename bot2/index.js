@@ -21,7 +21,7 @@ function setupMainBot() {
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: true, // Kulaklık Kapalı
+            selfDeaf: true, // ANA BOT: Sadece Kulaklık Kapalı
             selfMute: false
         });
         client.user.setPresence({
@@ -59,14 +59,15 @@ client.on('interactionCreate', async interaction => {
         tokens.forEach((token, index) => {
             const worker = new SelfClient({ 
                 checkUpdate: false,
-                // Discord'un 'all' hatasını ve güvenlik engelini aşmak için properties:
-                ws: { properties: { os: 'Windows', browser: 'Discord Client', release_channel: 'stable' } }
+                // KRİTİK AYAR: 'all' hatasını ve güvenlik engellerini aşmak için tarayıcıyı taklit eder
+                ws: { properties: { os: 'Windows', browser: 'Discord Client', release_channel: 'stable' } },
+                patchVoiceState: true 
             });
             
             worker.on('ready', async () => {
-                console.log(`📡 ${worker.user.tag} bağlandı, 3sn sonra sese giriyor...`);
+                console.log(`📡 ${worker.user.tag} bağlandı, sese hazırlanıyor...`);
                 
-                // Güvenlik için kısa bir bekleme
+                // Bağlantı stabilitesi için kısa bir gecikme
                 setTimeout(async () => {
                     try {
                         const guild = worker.guilds.cache.get(GUILD_ID);
@@ -74,30 +75,30 @@ client.on('interactionCreate', async interaction => {
                         
                         await channel.join();
                         
-                        // İŞÇİ AYARI: Mikrofon Kapalı, Kulaklık Açık
+                        // İŞÇİ AYARI: Sadece Mikrofon Kapalı
                         if (guild) {
-                            await guild.me.voice.setSelfMute(true);
-                            await guild.me.voice.setSelfDeaf(false);
+                            await guild.me.voice.setSelfMute(true); 
+                            await guild.me.voice.setSelfDeaf(false); 
                         }
                         
                         activeWorkers.push(worker);
-                        console.log(`✅ [İŞÇİ] ${worker.user.tag} kanala sızdı!`);
+                        console.log(`✅ [İŞÇİ] ${worker.user.tag} kanala girdi!`);
                     } catch (e) { 
                         console.log(`❌ [İŞÇİ] ${worker.user.tag} Ses Hatası: ${e.message}`); 
                     }
                 }, 3000);
             });
 
-            worker.login(token).catch(e => console.log(`❌ [TOKEN] ${index + 1} Giriş Başarısız: ${e.message}`));
+            worker.login(token).catch(e => console.log(`❌ [TOKEN] ${index + 1} Giriş Başarısız!`));
         });
 
-        await interaction.editReply(`✅ İşlem başlatıldı! **${selectedChannel.name}** kanalı kontrol ediliyor.`);
+        await interaction.editReply(`✅ İşçi botlar **${selectedChannel.name}** kanalına yönlendiriliyor...`);
     }
 
     if (interaction.commandName === 'botpasif') {
         activeWorkers.forEach(w => { try { w.destroy(); } catch(e) {} });
         activeWorkers = [];
-        await interaction.reply('❌ Tüm işçiler çekildi.');
+        await interaction.reply('❌ Tüm işçi botlar sesten çıkarıldı.');
     }
 });
 
