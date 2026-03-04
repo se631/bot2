@@ -14,14 +14,13 @@ const client = new Client({
 
 let activeWorkers = [];
 
-// --- ANA BOT BAĞLANTISI ---
 function setupMainBot() {
     try {
         joinVoiceChannel({
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: true, // ANA BOT: Sadece Kulaklık Kapalı
+            selfDeaf: true,
             selfMute: false
         });
         client.user.setPresence({
@@ -35,18 +34,12 @@ function setupMainBot() {
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(mainToken);
     const commands = [
-        new SlashCommandBuilder()
-            .setName('botaktif')
-            .setDescription('İşçi botları seçtiğin kanala sokar.')
-            .addChannelOption(o => o.setName('kanal').setDescription('Ses kanalını seçin').addChannelTypes(ChannelType.GuildVoice).setRequired(true)),
-        new SlashCommandBuilder()
-            .setName('botpasif')
-            .setDescription('İşçi botları sesten çıkarır.')
+        new SlashCommandBuilder().setName('botaktif').setDescription('İşçileri sokar.').addChannelOption(o => o.setName('kanal').setDescription('Kanal seç').addChannelTypes(ChannelType.GuildVoice).setRequired(true)),
+        new SlashCommandBuilder().setName('botpasif').setDescription('İşçileri çıkarır.')
     ].map(c => c.toJSON());
-
     await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
     setupMainBot();
-    console.log("🚀 Sistem hazır! Komutları kullanabilirsin.");
+    console.log("🚀 Sistem hazır!");
 });
 
 client.on('interactionCreate', async interaction => {
@@ -57,48 +50,45 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply();
 
         tokens.forEach((token, index) => {
+            // KRİTİK DEĞİŞİKLİK: 'all' hatasını engellemek için ayarları kapatıyoruz
             const worker = new SelfClient({ 
                 checkUpdate: false,
-                // KRİTİK AYAR: 'all' hatasını ve güvenlik engellerini aşmak için tarayıcıyı taklit eder
-                ws: { properties: { os: 'Windows', browser: 'Discord Client', release_channel: 'stable' } },
-                patchVoiceState: true 
+                autoRedeemNitro: false,
+                ws: { properties: { os: 'Windows', browser: 'Discord Client', release_channel: 'stable' } }
             });
-            
+
+            // Hata veren fonksiyonu manuel olarak devre dışı bırakıyoruz (Monkey Patch)
+            worker.settings = { _patch: () => {} }; 
+
             worker.on('ready', async () => {
-                console.log(`📡 ${worker.user.tag} bağlandı, sese hazırlanıyor...`);
-                
-                // Bağlantı stabilitesi için kısa bir gecikme
+                console.log(`📡 ${worker.user.tag} bağlandı.`);
                 setTimeout(async () => {
                     try {
-                        const guild = worker.guilds.cache.get(GUILD_ID);
                         const channel = await worker.channels.fetch(selectedChannel.id);
-                        
                         await channel.join();
                         
-                        // İŞÇİ AYARI: Sadece Mikrofon Kapalı
+                        const guild = worker.guilds.cache.get(GUILD_ID);
                         if (guild) {
-                            await guild.me.voice.setSelfMute(true); 
-                            await guild.me.voice.setSelfDeaf(false); 
+                            await guild.me.voice.setSelfMute(true);
+                            await guild.me.voice.setSelfDeaf(false);
                         }
                         
                         activeWorkers.push(worker);
-                        console.log(`✅ [İŞÇİ] ${worker.user.tag} kanala girdi!`);
-                    } catch (e) { 
-                        console.log(`❌ [İŞÇİ] ${worker.user.tag} Ses Hatası: ${e.message}`); 
-                    }
-                }, 3000);
+                        console.log(`✅ ${worker.user.tag} kanalda!`);
+                    } catch (e) { console.log(`❌ Ses Hatası: ${e.message}`); }
+                }, 2000);
             });
 
-            worker.login(token).catch(e => console.log(`❌ [TOKEN] ${index + 1} Giriş Başarısız!`));
+            worker.login(token).catch(() => console.log(`❌ Token ${index+1} hatalı!`));
         });
 
-        await interaction.editReply(`✅ İşçi botlar **${selectedChannel.name}** kanalına yönlendiriliyor...`);
+        await interaction.editReply(`✅ İşlem başlatıldı.`);
     }
 
     if (interaction.commandName === 'botpasif') {
         activeWorkers.forEach(w => { try { w.destroy(); } catch(e) {} });
         activeWorkers = [];
-        await interaction.reply('❌ Tüm işçi botlar sesten çıkarıldı.');
+        await interaction.reply('❌ İşçiler çıkarıldı.');
     }
 });
 
