@@ -26,7 +26,7 @@ function setupMainBot() {
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
             selfDeaf: true,
-            selfMute: true
+            selfMute: false
         });
 
         client.user.setPresence({
@@ -83,7 +83,7 @@ client.on('interactionCreate', async interaction => {
                     
                     const guild = worker.guilds.cache.get(interaction.guildId);
                     if (guild) {
-                        await guild.me.voice.setSelfDeaf(true);
+                        await guild.me.voice.setSelfDeaf(false);
                         await guild.me.voice.setSelfMute(true);
                     }
                     
@@ -105,3 +105,4 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(mainToken);
+
