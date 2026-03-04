@@ -18,15 +18,15 @@ const client = new Client({
 
 let activeWorkers = [];
 
-// Ana botun sabit duracağı kanal
+// --- ANA BOT AYARI ---
 function setupMainBot() {
     try {
         joinVoiceChannel({
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: true,
-            selfMute: false
+            selfDeaf: true, // Kulaklık Kapalı (Görseldeki gibi)
+            selfMute: false // Mikrofon Açık (Ama ses gitmez, sadece simge gözükmez)
         });
 
         client.user.setPresence({
@@ -37,14 +37,13 @@ function setupMainBot() {
             }],
             status: 'online',
         });
-        console.log("📌 Ana bot sabit kanala bağlandı.");
+        console.log("📌 Ana bot sağırlaştırılmış modda sese bağlandı.");
     } catch (e) { console.error("Ana bot hatası:", e.message); }
 }
 
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(mainToken);
     
-    // KOMUT GÜNCELLEMESİ: Kanal seçeneği eklendi
     const commands = [
         new SlashCommandBuilder()
             .setName('botaktif')
@@ -52,7 +51,7 @@ client.once('ready', async () => {
             .addChannelOption(option => 
                 option.setName('kanal')
                     .setDescription('Botların gireceği ses kanalını seçin')
-                    .addChannelTypes(ChannelType.GuildVoice) // Sadece ses kanallarını göster
+                    .addChannelTypes(ChannelType.GuildVoice)
                     .setRequired(true)),
         new SlashCommandBuilder()
             .setName('botpasif')
@@ -67,9 +66,7 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'botaktif') {
-        // Seçilen kanalı alıyoruz
         const selectedChannel = interaction.options.getChannel('kanal');
-
         await interaction.deferReply();
 
         tokens.forEach((token, index) => {
@@ -78,23 +75,25 @@ client.on('interactionCreate', async interaction => {
             
             worker.on('ready', async () => {
                 try {
+                    const guild = worker.guilds.cache.get(GUILD_ID);
+                    if (!guild) return console.log(`Worker ${index+1} sunucuda değil.`);
+
                     const channel = await worker.channels.fetch(selectedChannel.id);
                     await channel.join();
                     
-                    const guild = worker.guilds.cache.get(interaction.guildId);
-                    if (guild) {
-                        await guild.me.voice.setSelfDeaf(false);
-                        await guild.me.voice.setSelfMute(true);
-                    }
+                    // İŞÇİ AYARI: Sadece Mikrofon Kapalı
+                    await guild.me.voice.setSelfMute(true); 
+                    await guild.me.voice.setSelfDeaf(false); 
                     
                     activeWorkers.push(worker);
+                    console.log(`✅ [Worker] ${worker.user.tag} sese girdi.`);
                 } catch (e) { console.log(`Worker ${index + 1} hatası: ${e.message}`); }
             });
 
-            worker.login(token).catch(() => {});
+            worker.login(token).catch(() => console.log(`Token geçersiz: ${index+1}`));
         });
 
-        await interaction.editReply(`✅ İşçi botlar **${selectedChannel.name}** kanalına yönlendirildi!`);
+        await interaction.editReply(`✅ İşçi botlar **${selectedChannel.name}** kanalına gönderildi.`);
     }
 
     if (interaction.commandName === 'botpasif') {
@@ -105,4 +104,3 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(mainToken);
-
