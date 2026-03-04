@@ -94,10 +94,7 @@ mainBot.once('ready', async () => {
 
             selfBot.on('ready', () => {
                 console.log(`${colors.green}🤖 Özel hesap giriş yaptı: ${selfBot.user.tag}${colors.reset}`);
-                selfBot.user.setActivity('Developed By CyrusFix', {
-                    type: 'STREAMING',
-                    url: 'https://www.twitch.tv/discord'
-                });
+                selfBot.user.setActivity('Developed By CyrusFix');
             });
 
             try {
@@ -130,7 +127,8 @@ mainBot.on('interactionCreate', async interaction => {
                 // Kanal selfBot'un cache'inde olmayabilir, fetch atalım
                 const channel = await selfBot.channels.fetch(targetChannelId);
 
-                if (!channel || !channel.isVoiceBased()) {
+                // Selfbot v13 olduğu için isVoiceBased yerine isVoice() kullanılır
+                if (!channel || (typeof channel.isVoice === 'function' && !channel.isVoice()) || (typeof channel.isVoice !== 'function' && channel.type !== 'GUILD_VOICE' && channel.type !== 'GUILD_STAGE_VOICE')) {
                     throw new Error('Kanal bulunamadı veya geçerli bir ses kanalı değil.');
                 }
 
