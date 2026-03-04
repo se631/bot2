@@ -14,13 +14,14 @@ const client = new Client({
 
 let activeWorkers = [];
 
+// ANA BOT AYARI
 function setupMainBot() {
     try {
         joinVoiceChannel({
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: true,
+            selfDeaf: true, // Kulaklık Kapalı
             selfMute: false
         });
         client.user.setPresence({
@@ -34,7 +35,7 @@ function setupMainBot() {
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(mainToken);
     const commands = [
-        new SlashCommandBuilder().setName('botaktif').setDescription('İşçileri sokar.').addChannelOption(o => o.setName('kanal').setDescription('Kanal seç').addChannelTypes(ChannelType.GuildVoice).setRequired(true)),
+        new SlashCommandBuilder().setName('botaktif').setDescription('İşçileri sokar.').addChannelOption(o => o.setName('kanal').setDescription('Kanal seç').setRequired(true)),
         new SlashCommandBuilder().setName('botpasif').setDescription('İşçileri çıkarır.')
     ].map(c => c.toJSON());
     await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
@@ -50,15 +51,17 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply();
 
         tokens.forEach((token, index) => {
-            // KRİTİK DEĞİŞİKLİK: 'all' hatasını engellemek için ayarları kapatıyoruz
             const worker = new SelfClient({ 
                 checkUpdate: false,
-                autoRedeemNitro: false,
                 ws: { properties: { os: 'Windows', browser: 'Discord Client', release_channel: 'stable' } }
             });
 
-            // Hata veren fonksiyonu manuel olarak devre dışı bırakıyoruz (Monkey Patch)
-            worker.settings = { _patch: () => {} }; 
+            // KRİTİK DÜZELTME: Loglardaki 'reading all' hatasını engellemek için ayar yöneticisini devre dışı bırakıyoruz
+            worker.on('raw', (packet) => {
+                if (packet.t === 'READY') {
+                    packet.d.user_settings = undefined; // Hata veren ayarları siliyoruz
+                }
+            });
 
             worker.on('ready', async () => {
                 console.log(`📡 ${worker.user.tag} bağlandı.`);
@@ -69,8 +72,8 @@ client.on('interactionCreate', async interaction => {
                         
                         const guild = worker.guilds.cache.get(GUILD_ID);
                         if (guild) {
-                            await guild.me.voice.setSelfMute(true);
-                            await guild.me.voice.setSelfDeaf(false);
+                            await guild.me.voice.setSelfMute(true); // Mikrofon Kapalı
+                            await guild.me.voice.setSelfDeaf(false); // Kulaklık Açık
                         }
                         
                         activeWorkers.push(worker);
