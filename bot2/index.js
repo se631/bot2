@@ -9,62 +9,36 @@ const MAIN_BOT_VOICE_ID = process.env.MAIN_BOT_VOICE_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessages
-    ]
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMessages]
 });
 
 let activeWorkers = [];
 
-// --- ANA BOT AYARI ---
 function setupMainBot() {
     try {
-        const guild = client.guilds.cache.get(GUILD_ID);
-        if (!guild) return console.log("⚠️ Ana bot sunucuyu bulamadı, ID'yi kontrol et.");
-
         joinVoiceChannel({
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
-            adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: true, // Kulaklık Kapalı
-            selfMute: false // Mikrofon Açık
+            adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
+            selfDeaf: true,
+            selfMute: false
         });
-
         client.user.setPresence({
-            activities: [{ 
-                name: 'Developed by Cyrusfix', 
-                type: ActivityType.Streaming,
-                url: 'https://www.twitch.tv/cyrusfix'
-            }],
+            activities: [{ name: 'Developed by Cyrusfix', type: ActivityType.Streaming, url: 'https://www.twitch.tv/cyrusfix' }],
             status: 'online',
         });
-        console.log("📌 Ana bot sağırlaştırıldı ve sese girdi.");
     } catch (e) { console.error("Ana bot hatası:", e.message); }
 }
 
 client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(mainToken);
     const commands = [
-        new SlashCommandBuilder()
-            .setName('botaktif')
-            .setDescription('İşçi botları seçtiğin kanala sokar.')
-            .addChannelOption(option => 
-                option.setName('kanal')
-                    .setDescription('Botların gireceği ses kanalını seçin')
-                    .addChannelTypes(ChannelType.GuildVoice)
-                    .setRequired(true)),
-        new SlashCommandBuilder()
-            .setName('botpasif')
-            .setDescription('İşçi botları sesten çıkarır.')
+        new SlashCommandBuilder().setName('botaktif').setDescription('İşçileri seçtiğin kanala sokar.').addChannelOption(o => o.setName('kanal').setDescription('Ses kanalını seçin').addChannelTypes(ChannelType.GuildVoice).setRequired(true)),
+        new SlashCommandBuilder().setName('botpasif').setDescription('İşçileri çıkarır.')
     ].map(c => c.toJSON());
-
-    try {
-        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        setupMainBot();
-        console.log("🚀 Sistem tamamen hazır!");
-    } catch (err) { console.error("Komut yükleme hatası:", err); }
+    await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+    setupMainBot();
+    console.log("🚀 Sistem Hazır!");
 });
 
 client.on('interactionCreate', async interaction => {
@@ -74,49 +48,35 @@ client.on('interactionCreate', async interaction => {
         const selectedChannel = interaction.options.getChannel('kanal');
         await interaction.deferReply();
 
-        if (tokens.length === 0) return interaction.editReply("❌ WORKER_TOKENS değişkeni boş!");
-
         tokens.forEach((token, index) => {
-            // Hata giderici özel ayarlar
             const worker = new SelfClient({ 
                 checkUpdate: false,
-                patchVoiceState: true,
-                syncStatus: false
+                // KRİTİK AYAR: Hatayı engelleyen kısım
+                ws: { properties: { os: 'Linux', browser: 'Discord Client', release_channel: 'stable' } }
             });
             
             worker.on('ready', async () => {
                 try {
                     const channel = await worker.channels.fetch(selectedChannel.id);
                     await channel.join();
-                    
-                    const workerGuild = worker.guilds.cache.get(GUILD_ID);
-                    if (workerGuild) {
-                        // İŞÇİ AYARI: Sadece Mikrofon Kapalı
-                        await workerGuild.me.voice.setSelfMute(true);
-                        await workerGuild.me.voice.setSelfDeaf(false);
+                    const guild = worker.guilds.cache.get(GUILD_ID);
+                    if (guild) {
+                        await guild.me.voice.setSelfMute(true); // İşçi: Mikrofon Kapalı
+                        await guild.me.voice.setSelfDeaf(false); // İşçi: Kulaklık Açık
                     }
-                    
                     activeWorkers.push(worker);
-                    console.log(`✅ [Worker] ${worker.user.tag} başarıyla giriş yaptı.`);
-                } catch (e) { 
-                    console.log(`❌ [Worker ${index + 1}] Ses Hatası: ${e.message}`);
-                }
+                    console.log(`✅ ${worker.user.tag} sese girdi.`);
+                } catch (e) { console.log(`Hata: ${e.message}`); }
             });
-
-            worker.login(token).catch(err => {
-                console.log(`❌ [Worker ${index + 1}] Login Hatası: ${err.message}`);
-            });
+            worker.login(token).catch(e => console.log("Login hatası!"));
         });
-
-        await interaction.editReply(`✅ İşçi botlar **${selectedChannel.name}** kanalına yönlendiriliyor...`);
+        await interaction.editReply(`✅ İşçiler **${selectedChannel.name}** kanalına yönlendirildi.`);
     }
 
     if (interaction.commandName === 'botpasif') {
-        activeWorkers.forEach(w => {
-            try { w.destroy(); } catch(e) {}
-        });
+        activeWorkers.forEach(w => { try { w.destroy(); } catch(e) {} });
         activeWorkers = [];
-        await interaction.reply('❌ Tüm işçi botlar sesten çıkarıldı.');
+        await interaction.reply('❌ İşçiler sesten çıkarıldı.');
     }
 });
 
