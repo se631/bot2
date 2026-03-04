@@ -25,8 +25,8 @@ function setupMainBot() {
             channelId: MAIN_BOT_VOICE_ID,
             guildId: GUILD_ID,
             adapterCreator: client.guilds.cache.get(GUILD_ID).voiceAdapterCreator,
-            selfDeaf: false,
-            selfMute: true
+            selfDeaf: true,
+            selfMute: false
         });
 
         client.user.setPresence({
@@ -90,4 +90,5 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(mainToken);
+
 
